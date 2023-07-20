@@ -1,20 +1,42 @@
-<script lang="ts">
-	import { createCombobox } from 'svelte-headlessui';
+<script lang="ts" context="module">
+	export type ComboboxItem = {
+		value: string;
+		disabled: boolean;
+	};
+</script>
 
-	/** Set the options that are selectable. */
-	export let options: string[];
+<script lang="ts">
+	import { createCombobox } from '@melt-ui/svelte';
+
+	/* MELT PROPS */
+
+	/** A function that returns true if the item should be included in the filtered list. */
+	export let filterFunction = (item: ComboboxItem, inputValue: string) => {
+		const normalize = (str: string) => str.normalize().toLowerCase();
+		const normalizedInput = normalize(inputValue);
+		return normalizedInput === '' || normalize(item.value).includes(normalizedInput);
+	};
+	/** The list of items to display in the combobox list. */
+	export let items: ComboboxItem[];
+	/** A function that returns a string representation of the item. */
+	export let itemToString = (item: ComboboxItem) => item.value;
+	/** Whether or not the combobox should loop through the list when the end or beginning is reached. */
+	export let loop = false;
+	/** The alignment of the highlighted item when scrolling. */
+	export let scrollAlignment: Extract<ScrollLogicalPosition, 'center' | 'nearest'> = 'nearest';
+
+	/* OTHER PROPS */
+
 	/** Set the value that should be selected. */
-	export let selected: string;
-	/** Set the aria label of the input. */
-	export let ariaLabel: string;
+	export let selected = '';
 	/** Set the width of the search bar. */
 	export let width = 'w-72 min-w-50';
-
 	/** Set the search icon. Example: 'i-material-symbols-cloud text-lg|xl'. */
 	export let searchIcon = '';
 	/** Set the select icon. Example: 'i-material-symbols-cloud text-lg|xl'. */
 	export let selectIcon = '';
-
+	/** Set the combobox input field placeholder */
+	export let placeholder = '';
 	/** Set the button styles. */
 	export let buttonStyle = 'primary-500/90 hover:primary-500';
 	/** Set the active list element styles. Use tokens such as 'primary-500'. */
@@ -22,14 +44,15 @@
 	/** Set the in-active list element styles. */
 	export let inactiveStyle = 'text-surface-900';
 
-	const combobox = createCombobox({ label: ariaLabel, selected });
-
-	$: filtered = options.filter((item) =>
-		item
-			.toLowerCase()
-			.replace(/\s+/g, '')
-			.includes($combobox.filter.toLowerCase().replace(/\s+/g, ''))
-	);
+	const { open, input, menu, item, inputValue, isSelected, filteredItems, selectedItem } =
+		createCombobox({
+			items,
+			filterFunction,
+			itemToString,
+			scrollAlignment,
+			loop
+		});
+	selected && selectedItem.set(selected);
 </script>
 
 <div class={width}>
@@ -38,13 +61,15 @@
 			class="flex w-full cursor-default overflow-hidden rounded-container text-left shadow-md shadow-surface-900/40 focus:outline-none focus-visible:(ring-2 ring-white ring-opacity-75 ring-offset-2 ring-offset-primary-300)"
 		>
 			<input
-				use:combobox.input
+				{...$input}
+				use:$input.action
 				on:select
 				class="w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-surface-900 focus:ring-0 transition-all"
-				value={$combobox.selected}
+				value={$inputValue}
+				{placeholder}
 			/>
 			<button
-				use:combobox.button
+				on:click={open.set(!$open)}
 				type="button"
 				class="flex justify-center items-center px-2 rounded-r-container transition-all {buttonStyle}"
 			>
@@ -62,43 +87,45 @@
 			</button>
 		</div>
 
-		{#if $combobox.expanded}
-			<ul
-				use:combobox.items
-				class="absolute mt-1 max-h-60 w-full overflow-auto rounded-container bg-white py-1 text-base shadow-lg ring-1 ring-surface-900/10 focus:outline-none"
-			>
-				{#each filtered as value}
-					{@const active = $combobox.active === value}
-					{@const select = $combobox.selected === value}
-					<li
-						class="relative cursor-default select-none py-2 pl-10 pr-4 {active
-							? activeStyle
-							: inactiveStyle}"
-						use:combobox.item={{ value }}
-					>
-						<span class="block truncate {select ? 'font-medium' : 'font-normal'}">{value}</span>
-						{#if select}
-							<span class="absolute inset-y-0 left-0 flex items-center pl-3">
-								{#if selectIcon}
-									<span class={selectIcon} />
-								{:else}
-									<!-- i-material-symbols-check-small-rounded -->
-									<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-										><path
-											fill="currentColor"
-											d="m10 13.6l5.9-5.9q.275-.275.7-.275t.7.275q.275.275.275.7t-.275.7l-6.6 6.6q-.3.3-.7.3t-.7-.3l-2.6-2.6q-.275-.275-.275-.7t.275-.7q.275-.275.7-.275t.7.275l1.9 1.9Z"
-										/></svg
-									>
-								{/if}
-							</span>
-						{/if}
-					</li>
-				{:else}
-					<li class="relative cursor-default select-none py-2 pl-10 pr-4 text-surface-900">
-						<span class="block truncate font-normal">Nothing found</span>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<ul
+			{...$menu}
+			use:$menu.action
+			class="absolute mt-1 max-h-60 w-full overflow-auto rounded-container bg-white py-1 text-base shadow-lg ring-1 ring-surface-900/10 focus:outline-none"
+		>
+			{#if $open}
+				{#if $filteredItems.length !== 0}
+					{#each $filteredItems as currItem, index (index)}
+						<li
+							{...$item({ index, item: currItem, disabled: currItem.disabled })}
+							use:$item.action
+							class="relative cursor-default select-none py-2 pl-10 pr-4 data-[highlighted]:{activeStyle} data-[disabled]:{inactiveStyle}"
+						>
+							<span class="block truncate {$isSelected(currItem) ? 'font-medium' : 'font-normal'}"
+								>{currItem.value}</span
+							>
+							{#if $isSelected(currItem)}
+								<span class="absolute inset-y-0 left-0 flex items-center pl-3">
+									{#if selectIcon}
+										<span class={selectIcon} />
+									{:else}
+										<!-- i-material-symbols-check-small-rounded -->
+										<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+											><path
+												fill="currentColor"
+												d="m10 13.6l5.9-5.9q.275-.275.7-.275t.7.275q.275.275.275.7t-.275.7l-6.6 6.6q-.3.3-.7.3t-.7-.3l-2.6-2.6q-.275-.275-.275-.7t.275-.7q.275-.275.7-.275t.7.275l1.9 1.9Z"
+											/></svg
+										>
+									{/if}
+								</span>
+							{/if}
+						</li>
+					{:else}
+						<li class="relative cursor-default select-none py-2 pl-10 pr-4 text-surface-900">
+							<span class="block truncate font-normal">Nothing found</span>
+						</li>
+					{/each}
+				{/if}
+			{/if}
+		</ul>
 	</div>
 </div>
