@@ -24,5 +24,5 @@
 </script>
 
 <div class="flex gap-4 flex-wrap justify-center items-center">
-	<Combobox items={options} activeStyle="bg-blue-400" inactiveStyle="opacity-50" />
+	<Combobox items={options} activeStyle="bg-blue-400" inactiveStyle="opacity-50 bg-red-500" />
 </div>

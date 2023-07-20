@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-	export type ComboboxItem = {
+	type ComboboxItem = {
 		value: string;
 		disabled: boolean;
 	};
