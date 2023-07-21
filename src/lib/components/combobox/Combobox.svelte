@@ -23,7 +23,7 @@
 	/** Whether or not the combobox should loop through the list when the end or beginning is reached. */
 	export let loop = false;
 	/** The alignment of the highlighted item when scrolling. */
-	export let scrollAlignment: Extract<ScrollLogicalPosition, 'center' | 'nearest'> = 'nearest';
+	export let scrollAlignment: 'center' | 'nearest' = 'nearest';
 
 	/* OTHER PROPS */
 
